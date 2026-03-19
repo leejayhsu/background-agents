@@ -16,7 +16,13 @@ const COLOR_SCHEME_OPTIONS: { value: ColorSchemeMode; label: string; icon: typeo
   { value: "system", label: "System", icon: MonitorIcon },
 ];
 
-function ThemeRow({ label, description, value, themes, onChange }: {
+function ThemeRow({
+  label,
+  description,
+  value,
+  themes,
+  onChange,
+}: {
   label: string;
   description: string;
   value: string;
@@ -35,7 +41,9 @@ function ThemeRow({ label, description, value, themes, onChange }: {
         className="text-sm bg-background border border-border rounded px-2 py-1.5 text-foreground"
       >
         {themes.map((t) => (
-          <option key={t.id} value={t.id}>{t.label}</option>
+          <option key={t.id} value={t.id}>
+            {t.label}
+          </option>
         ))}
       </select>
     </div>
@@ -90,8 +98,20 @@ export function AppearanceSettings() {
             </ToggleGroup>
           </div>
 
-          <ThemeRow label="Light theme" description="Used when color scheme is light" value={preferredLightTheme} themes={LIGHT_THEMES} onChange={(v) => update({ preferredLightTheme: v })} />
-          <ThemeRow label="Dark theme" description="Used when color scheme is dark" value={preferredDarkTheme} themes={DARK_THEMES} onChange={(v) => update({ preferredDarkTheme: v })} />
+          <ThemeRow
+            label="Light theme"
+            description="Used when color scheme is light"
+            value={preferredLightTheme}
+            themes={LIGHT_THEMES}
+            onChange={(v) => update({ preferredLightTheme: v })}
+          />
+          <ThemeRow
+            label="Dark theme"
+            description="Used when color scheme is dark"
+            value={preferredDarkTheme}
+            themes={DARK_THEMES}
+            onChange={(v) => update({ preferredDarkTheme: v })}
+          />
         </div>
       </div>
     </div>

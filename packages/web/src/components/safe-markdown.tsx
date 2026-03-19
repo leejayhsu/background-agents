@@ -6,7 +6,6 @@ import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import type { ComponentPropsWithoutRef } from "react";
 
-
 // Strict sanitization schema to prevent XSS
 // Based on GitHub's sanitization but even more restrictive
 const sanitizeSchema = {
@@ -83,7 +82,10 @@ export function SafeMarkdown({ content, className = "" }: SafeMarkdownProps) {
           ),
           // Code blocks with styling
           pre: ({ children, ...props }: ComponentPropsWithoutRef<"pre">) => (
-            <pre className="not-prose overflow-x-auto text-[0.8125rem] leading-relaxed rounded" {...props}>
+            <pre
+              className="not-prose overflow-x-auto text-[0.8125rem] leading-relaxed rounded"
+              {...props}
+            >
               {children}
             </pre>
           ),
