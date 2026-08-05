@@ -161,7 +161,7 @@ function validCompletion(overrides: Record<string, unknown> = {}) {
   return {
     buildId: "imgb-env_1-1-abcd",
     repositoryShas: [{ repoOwner: "acme", repoName: "web", baseSha: "abc123" }],
-    runtimeVersion: "v56-managed-provider-runtime",
+    runtimeVersion: "v57-vnc-runtime",
     buildDurationMs: 12_500,
     ...overrides,
   };

@@ -14,6 +14,7 @@ import {
   applyScmCloneEnv,
   buildSandboxEnvVars,
   deriveCodeServerPassword,
+  deriveVncPassword,
   IMAGE_BUILD_EXECUTION_TIMEOUT_ENV_KEY,
   IMAGE_BUILD_MODE_ENV_VAR,
   scmCloneIdentity,
@@ -83,6 +84,7 @@ export interface VercelProviderConfig {
   baseSnapshotName?: string;
   runtime?: string;
   snapshotExpirationMs?: number;
+  /** Secret used for domain-separated sandbox access password derivation. */
   codeServerPasswordSecret: string;
   apiBaseUrl?: string;
   token: string;
@@ -140,6 +142,7 @@ export class VercelSandboxProvider implements SandboxProvider {
       );
       const ports = collectExposedPorts(
         config.codeServerEnabled,
+        config.vncEnabled,
         config.sandboxSettings
       ).allExposedPorts;
       const sourceSnapshotId =
@@ -168,6 +171,7 @@ export class VercelSandboxProvider implements SandboxProvider {
         created,
         config.sandboxId,
         config.codeServerEnabled,
+        config.vncEnabled,
         config.sandboxSettings,
         config.correlation
       );
@@ -182,6 +186,8 @@ export class VercelSandboxProvider implements SandboxProvider {
         codeServerUrl: access.codeServerUrl,
         codeServerPassword: access.codeServerPassword,
         ttydUrl: access.ttydUrl,
+        vncUrl: access.vncUrl,
+        vncPassword: access.vncPassword,
         tunnelUrls: access.tunnelUrls,
       };
     } catch (error) {
@@ -198,6 +204,7 @@ export class VercelSandboxProvider implements SandboxProvider {
       );
       const ports = collectExposedPorts(
         config.codeServerEnabled,
+        config.vncEnabled,
         config.sandboxSettings
       ).allExposedPorts;
 
@@ -219,6 +226,7 @@ export class VercelSandboxProvider implements SandboxProvider {
         created,
         config.sandboxId,
         config.codeServerEnabled,
+        config.vncEnabled,
         config.sandboxSettings,
         config.correlation
       );
@@ -232,6 +240,8 @@ export class VercelSandboxProvider implements SandboxProvider {
         codeServerUrl: access.codeServerUrl,
         codeServerPassword: access.codeServerPassword,
         ttydUrl: access.ttydUrl,
+        vncUrl: access.vncUrl,
+        vncPassword: access.vncPassword,
         tunnelUrls: access.tunnelUrls,
       };
     } catch (error) {
@@ -388,6 +398,9 @@ export class VercelSandboxProvider implements SandboxProvider {
             this.providerConfig.codeServerPasswordSecret
           )
         : undefined,
+      vncPassword: config.vncEnabled
+        ? await deriveVncPassword(config.sandboxId, this.providerConfig.codeServerPasswordSecret)
+        : undefined,
     });
     Object.assign(envVars, this.buildPlatformEnvVars());
 
@@ -403,6 +416,7 @@ export class VercelSandboxProvider implements SandboxProvider {
 
     const tunnelPorts = collectExposedPorts(
       config.codeServerEnabled,
+      config.vncEnabled,
       config.sandboxSettings
     ).extraTunnelPorts;
     if (tunnelPorts.length > 0) {
@@ -466,16 +480,23 @@ export class VercelSandboxProvider implements SandboxProvider {
     created: VercelCreateSandboxResponse,
     logicalSandboxId: string,
     codeServerEnabled: boolean | undefined,
+    vncEnabled: boolean | undefined,
     sandboxSettings: SandboxSettings | undefined,
     correlation?: CreateSandboxConfig["correlation"]
   ): Promise<{
     codeServerUrl?: string;
     codeServerPassword?: string;
     ttydUrl?: string;
+    vncUrl?: string;
+    vncPassword?: string;
     tunnelUrls?: Record<string, string>;
   }> {
     const routeByPort = new Map(created.routes.map((route) => [route.port, route]));
-    const { extraTunnelPorts } = collectExposedPorts(codeServerEnabled, sandboxSettings);
+    const { extraTunnelPorts } = collectExposedPorts(
+      codeServerEnabled,
+      vncEnabled,
+      sandboxSettings
+    );
     const tunnelUrls: Record<string, string> = {};
 
     for (const port of extraTunnelPorts) {
@@ -487,13 +508,14 @@ export class VercelSandboxProvider implements SandboxProvider {
       await this.writeTunnelEnvFile(created.session.id, logicalSandboxId, tunnelUrls, correlation);
     }
 
-    const { codeServerPort, terminalPort } = resolveServicePorts(sandboxSettings);
+    const { codeServerPort, terminalPort, vncPort } = resolveServicePorts(sandboxSettings);
     const codeServerUrl = codeServerEnabled
       ? routeToUrl(routeByPort.get(codeServerPort))
       : undefined;
     const ttydUrl = sandboxSettings?.terminalEnabled
       ? routeToUrl(routeByPort.get(terminalPort))
       : undefined;
+    const vncUrl = vncEnabled ? routeToUrl(routeByPort.get(vncPort)) : undefined;
 
     return {
       codeServerUrl,
@@ -504,6 +526,10 @@ export class VercelSandboxProvider implements SandboxProvider {
           )
         : undefined,
       ttydUrl,
+      vncUrl,
+      vncPassword: vncEnabled
+        ? await deriveVncPassword(logicalSandboxId, this.providerConfig.codeServerPasswordSecret)
+        : undefined,
       tunnelUrls: Object.keys(tunnelUrls).length > 0 ? tunnelUrls : undefined,
     };
   }
@@ -641,9 +667,10 @@ export class VercelSandboxProvider implements SandboxProvider {
 
 function collectExposedPorts(
   codeServerEnabled: boolean | undefined,
+  vncEnabled: boolean | undefined,
   sandboxSettings: SandboxSettings | undefined
 ): { allExposedPorts: number[]; extraTunnelPorts: number[] } {
-  const { codeServerPort, terminalPort } = resolveServicePorts(sandboxSettings);
+  const { codeServerPort, terminalPort, vncPort } = resolveServicePorts(sandboxSettings);
   const reserved = new Set<number>();
   const exposed: number[] = [];
 
@@ -654,6 +681,10 @@ function collectExposedPorts(
   if (sandboxSettings?.terminalEnabled) {
     exposed.push(terminalPort);
     reserved.add(terminalPort);
+  }
+  if (vncEnabled) {
+    exposed.push(vncPort);
+    reserved.add(vncPort);
   }
 
   const extraTunnelPorts = resolveTunnelPorts(sandboxSettings?.tunnelPorts).filter(
