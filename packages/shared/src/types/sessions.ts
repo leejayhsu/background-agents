@@ -206,6 +206,8 @@ export interface SessionState {
   totalCost?: number;
   codeServerUrl?: string | null;
   codeServerPassword?: string | null;
+  vncUrl?: string | null;
+  vncPassword?: string | null;
   tunnelUrls?: Record<string, string> | null;
   ttydUrl?: string | null;
   ttydToken?: string | null;
@@ -269,6 +271,8 @@ export const sessionStateSchema = z.object({
   totalCost: z.number().optional(),
   codeServerUrl: z.string().nullable().optional(),
   codeServerPassword: z.string().nullable().optional(),
+  vncUrl: z.string().nullable().optional(),
+  vncPassword: z.string().nullable().optional(),
   tunnelUrls: z.record(z.string(), z.string()).nullable().optional(),
   ttydUrl: z.string().nullable().optional(),
   ttydToken: z.string().nullable().optional(),

@@ -89,6 +89,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     title: z.string().nullable(),
   }),
   z.object({ type: z.literal("code_server_info"), url: z.string(), password: z.string() }),
+  z.object({ type: z.literal("vnc_info"), url: z.string(), password: z.string() }),
   z.object({ type: z.literal("ttyd_info"), url: z.string(), token: z.string() }),
   z.object({ type: z.literal("tunnel_urls"), urls: z.record(z.string(), z.string()) }),
   z.object({ type: z.literal("sandbox_dashboard_url"), url: z.string() }),

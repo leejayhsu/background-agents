@@ -3,6 +3,8 @@ import {
   applyScmCloneEnv,
   buildSandboxEnvVars,
   buildSessionConfig,
+  deriveCodeServerPassword,
+  deriveVncPassword,
   scmCloneIdentity,
 } from "./sandbox-env";
 import { DEFAULT_SANDBOX_TIMEOUT_SECONDS, type CreateSandboxConfig } from "./provider";
@@ -226,6 +228,25 @@ describe("buildSandboxEnvVars", () => {
     expect(enabled.CODE_SERVER_PASSWORD).toBe("pw");
   });
 
+  it("injects VNC credentials and port only when enabled", () => {
+    const disabled = buildSandboxEnvVars(
+      {
+        ...baseConfig,
+        userEnvVars: { VNC_PASSWORD: "user-password", NOVNC_PORT: "9999" },
+      },
+      { scmIdentity: scmCloneIdentity("github"), vncPassword: "derived-password" }
+    );
+    expect(disabled).not.toHaveProperty("VNC_PASSWORD");
+    expect(disabled).not.toHaveProperty("NOVNC_PORT");
+
+    const enabled = buildSandboxEnvVars(
+      { ...baseConfig, vncEnabled: true, sandboxSettings: { vncPort: 6099 } },
+      { scmIdentity: scmCloneIdentity("github"), vncPassword: "derived-password" }
+    );
+    expect(enabled.VNC_PASSWORD).toBe("derived-password");
+    expect(enabled.NOVNC_PORT).toBe("6099");
+  });
+
   it("sets the slack-notify flag only when enabled", () => {
     expect(
       buildSandboxEnvVars(baseConfig, { scmIdentity: scmCloneIdentity("github") })
@@ -251,5 +272,16 @@ describe("buildSandboxEnvVars", () => {
     expect(envVars.LLM_KEY).toBe("sk-provider");
     expect(envVars.SANDBOX_ID).toBe("sandbox-456");
     expect(envVars).not.toHaveProperty("IGNORED");
+  });
+});
+
+describe("sandbox access passwords", () => {
+  it("uses deterministic, distinct HMAC domains for code-server and VNC", async () => {
+    const codePassword = await deriveCodeServerPassword("sandbox-456", "secret");
+    const vncPassword = await deriveVncPassword("sandbox-456", "secret");
+
+    expect(await deriveVncPassword("sandbox-456", "secret")).toBe(vncPassword);
+    expect(vncPassword).not.toBe(codePassword);
+    expect(vncPassword).toMatch(/^[A-Za-z0-9]{8}$/);
   });
 });

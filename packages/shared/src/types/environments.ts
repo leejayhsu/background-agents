@@ -82,7 +82,7 @@ export interface Environment {
    * channel-association stage). Absent when the environment has none.
    */
   channelAssociations?: string[];
-  /** Ordered repositories; [0] is the primary (sandbox/code-server settings source). */
+  /** Ordered repositories; [0] is the primary (sandbox/integration settings source). */
   repositories: EnvironmentRepository[];
 }
 

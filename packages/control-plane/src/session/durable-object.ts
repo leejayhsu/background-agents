@@ -756,6 +756,14 @@ export class SessionDO extends DurableObject<Env> {
       },
       clearSandboxCodeServer: () => this.repository.clearSandboxCodeServer(),
       clearSandboxCodeServerUrl: () => this.repository.clearSandboxCodeServerUrl(),
+      updateSandboxVnc: async (url, password) => {
+        const encrypted = this.env.REPO_SECRETS_ENCRYPTION_KEY
+          ? await encryptToken(password, this.env.REPO_SECRETS_ENCRYPTION_KEY)
+          : password;
+        this.repository.updateSandboxVnc(url, encrypted);
+      },
+      clearSandboxVnc: () => this.repository.clearSandboxVnc(),
+      clearSandboxVncUrl: () => this.repository.clearSandboxVncUrl(),
       updateSandboxTunnelUrls: (urls) => this.repository.updateSandboxTunnelUrls(urls),
       clearSandboxTunnelUrls: () => this.repository.clearSandboxTunnelUrls(),
       updateSandboxTtyd: async (url, token) => {
@@ -1684,6 +1692,15 @@ export class SessionDO extends DurableObject<Env> {
       }
     }
 
+    let vncPassword: string | null = sandbox?.vnc_password ?? null;
+    if (vncPassword && this.env.REPO_SECRETS_ENCRYPTION_KEY) {
+      try {
+        vncPassword = await decryptToken(vncPassword, this.env.REPO_SECRETS_ENCRYPTION_KEY);
+      } catch {
+        vncPassword = null;
+      }
+    }
+
     // Decrypt ttyd token if stored encrypted
     let ttydToken: string | null = sandbox?.ttyd_token ?? null;
     if (ttydToken && this.env.REPO_SECRETS_ENCRYPTION_KEY) {
@@ -1718,6 +1735,8 @@ export class SessionDO extends DurableObject<Env> {
       totalCost: session?.total_cost ?? 0,
       codeServerUrl: sandbox?.code_server_url ?? null,
       codeServerPassword,
+      vncUrl: sandbox?.vnc_url ?? null,
+      vncPassword,
       tunnelUrls: sandbox?.tunnel_urls ? this.safeParseTunnelUrls(sandbox.tunnel_urls) : null,
       ttydUrl: sandbox?.ttyd_url ?? null,
       ttydToken,

@@ -31,6 +31,22 @@ describe("artifact_updated server message", () => {
   });
 });
 
+describe("VNC session protocol", () => {
+  it("parses VNC access information", () => {
+    expect(
+      serverMessageSchema.parse({
+        type: "vnc_info",
+        url: "https://desktop.example",
+        password: "secret",
+      })
+    ).toEqual({
+      type: "vnc_info",
+      url: "https://desktop.example",
+      password: "secret",
+    });
+  });
+});
+
 describe("Session.pullRequestSummary contract", () => {
   it("is optional on the session list contract and counts by display status", () => {
     expectTypeOf<Session["pullRequestSummary"]>().toEqualTypeOf<PullRequestSummary | undefined>();

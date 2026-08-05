@@ -2,7 +2,7 @@
 
 import { escapeRegExp } from "../regex";
 
-export type IntegrationId = "github" | "linear" | "code-server" | "sandbox" | "slack";
+export type IntegrationId = "github" | "linear" | "code-server" | "vnc" | "sandbox" | "slack";
 
 /** Enforces the common shape for all integration configurations. */
 export interface IntegrationEntry<
@@ -48,6 +48,11 @@ export interface CodeServerSettings {
   enabled?: boolean;
 }
 
+/** Overridable behavior settings for the VNC desktop integration. */
+export interface VncSettings {
+  enabled?: boolean;
+}
+
 /** Maximum number of tunnel ports a user can configure per sandbox. */
 export const MAX_TUNNEL_PORTS = 10;
 
@@ -57,6 +62,12 @@ export const MAX_TUNNEL_PORTS = 10;
  */
 export const DEFAULT_CODE_SERVER_PORT = 8080;
 
+/** Default public noVNC/websockify port inside the sandbox. */
+export const DEFAULT_VNC_PORT = 6080;
+
+/** Internal VNC server port. Reserved because noVNC proxies it. */
+export const INTERNAL_VNC_PORT = 5900;
+
 /**
  * Default port the web terminal (ttyd) proxy is exposed on. Mirrors
  * `TTYD_PROXY_PORT` in `packages/sandbox-runtime/src/sandbox_runtime/constants.py`.
@@ -65,7 +76,7 @@ export const DEFAULT_TERMINAL_PORT = 7680;
 
 /**
  * Internal ttyd port (localhost-only, behind the proxy). Reserved: it is never
- * exposed and cannot be chosen as a code-server, terminal, or tunnel port.
+ * exposed and cannot be chosen as a service or tunnel port.
  * Mirrors `TTYD_PORT` in `packages/sandbox-runtime/src/sandbox_runtime/constants.py`.
  */
 export const INTERNAL_TTYD_PORT = 7681;
@@ -83,9 +94,9 @@ export type SandboxPortConflict =
   | { kind: "duplicate"; port: number; label: string };
 
 /**
- * Find the first conflict across configured sandbox ports (code-server,
- * terminal, and tunnel ports): a port equal to the reserved internal ttyd port
- * ({@link INTERNAL_TTYD_PORT}), or a port used more than once. Returns null when
+ * Find the first conflict across configured sandbox ports: a port reserved for
+ * an internal service ({@link INTERNAL_TTYD_PORT} or
+ * {@link INTERNAL_VNC_PORT}), or a port used more than once. Returns null when
  * every port is usable.
  *
  * Enablement-independent — every configured port must be unique so none is
@@ -97,7 +108,9 @@ export function findSandboxPortConflict(
 ): SandboxPortConflict | null {
   const seen = new Set<number>();
   for (const { port, label } of ports) {
-    if (port === INTERNAL_TTYD_PORT) return { kind: "reserved", port, label };
+    if (port === INTERNAL_TTYD_PORT || port === INTERNAL_VNC_PORT) {
+      return { kind: "reserved", port, label };
+    }
     if (seen.has(port)) return { kind: "duplicate", port, label };
     seen.add(port);
   }
@@ -156,6 +169,11 @@ export interface SandboxSettings {
    * port for your own service on a tunnel.
    */
   codeServerPort?: number;
+  /**
+   * Port noVNC/websockify binds to inside the sandbox (only used when VNC is
+   * enabled). Unset → DEFAULT_VNC_PORT.
+   */
+  vncPort?: number;
   /**
    * Port the web terminal (ttyd) proxy is exposed on (only used when
    * `terminalEnabled`). Unset → DEFAULT_TERMINAL_PORT. Ignored by providers
@@ -319,7 +337,7 @@ export function matchRoutingRules(message: string, rules: SlackRoutingRule[]): S
  * the trigger repo before a session exists, and slack is global/per-repo only.
  * The environment-level shape is the integration's repo (override) shape.
  */
-export const ENVIRONMENT_SETTINGS_INTEGRATION_IDS = ["sandbox", "code-server"] as const;
+export const ENVIRONMENT_SETTINGS_INTEGRATION_IDS = ["sandbox", "code-server", "vnc"] as const;
 
 export type EnvironmentSettingsIntegrationId =
   (typeof ENVIRONMENT_SETTINGS_INTEGRATION_IDS)[number];
@@ -329,6 +347,7 @@ export interface IntegrationSettingsMap {
   github: IntegrationEntry<GitHubBotSettings>;
   linear: IntegrationEntry<LinearBotSettings>;
   "code-server": IntegrationEntry<CodeServerSettings>;
+  vnc: IntegrationEntry<VncSettings>;
   sandbox: IntegrationEntry<SandboxSettings>;
   slack: IntegrationEntry<SlackRepoSettings, SlackGlobalSettings>;
 }
@@ -337,6 +356,7 @@ export interface IntegrationSettingsMap {
 export type GitHubGlobalConfig = IntegrationSettingsMap["github"]["global"];
 export type LinearGlobalConfig = IntegrationSettingsMap["linear"]["global"];
 export type CodeServerGlobalConfig = IntegrationSettingsMap["code-server"]["global"];
+export type VncGlobalConfig = IntegrationSettingsMap["vnc"]["global"];
 export type SandboxGlobalConfig = IntegrationSettingsMap["sandbox"]["global"];
 export type SlackGlobalConfig = IntegrationSettingsMap["slack"]["global"];
 
@@ -385,6 +405,11 @@ export const INTEGRATION_DEFINITIONS: {
     id: "code-server",
     name: "Code Server",
     description: "Browser-based VS Code editor attached to sandbox sessions",
+  },
+  {
+    id: "vnc",
+    name: "VNC Desktop",
+    description: "Remote desktop access attached to sandbox sessions",
   },
   {
     id: "sandbox",
